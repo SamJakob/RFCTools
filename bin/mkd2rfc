@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# Ensure at least 1 file is specified.
+if [ $# -eq 0 ]; then
+    echo "Usage: mkd2rfc <filename.mkd> [<filename.mkd>...]"
+    exit 1
+fi
+
+# Make ./out if it does not exist.
+mkdir -p ./out
+
+# For each input file, run kramdown-rfc to generate the
+# xml for xml2rfc, then generate the text, html and pdf
+# files from the resulting xml file.
+while [ $# -gt 0 ]; do
+    # Read the input file.
+    SOURCE="$1"
+    shift
+
+    # Determine the basename of the target file.
+    TARGET_BASENAME=$(basename "$SOURCE" .mkd)
+    # Check if the input file is indeed a kramdown
+    # (.mkd) file.
+    if [ "$SOURCE" = "$TARGET_BASENAME" ]; then
+        echo "Error: The specified source file, $SOURCE, is not a kramdown file. Please ensure the file extension is `.mkd`."
+        exit 2
+    fi
+
+    # Use kramdown-rfc to convert the file from kramdown
+    # to RFC XML.
+    kramdown-rfc $SOURCE > "out/$TARGET_BASENAME.xml"
+
+    # Assuming kramdown-rfc worked, run xml2rfc for each
+    # output format.
+    if [ $? -eq 0 ]; then
+        xml2rfc --text "out/$TARGET_BASENAME.xml" -o "out/$TARGET_BASENAME.txt" & \
+        xml2rfc --html "out/$TARGET_BASENAME.xml" -o "out/$TARGET_BASENAME.html" & \
+        xml2rfc --pdf "out/$TARGET_BASENAME.xml" -o "out/$TARGET_BASENAME.pdf"
+    else
+        echo "Generating XML RFC output from the kramdown source failed for $SOURCE."
+        exit 3
+    fi
+
+done
